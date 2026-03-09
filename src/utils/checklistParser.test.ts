@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as zlib from "zlib";
-import { getChecklistItems } from "./checklistParser.js";
+import { getChecklistItems, hasFullDiskAccess } from "./checklistParser.js";
 
 // Mock child_process to avoid actual database access
 vi.mock("child_process", () => ({
@@ -22,7 +22,9 @@ vi.mock("fs", () => ({
 }));
 
 import { execSync } from "child_process";
+import { existsSync } from "fs";
 const mockExecSync = vi.mocked(execSync);
+const mockExistsSync = vi.mocked(existsSync);
 
 /**
  * Builds a minimal Apple Notes protobuf structure with checklist items.
@@ -102,6 +104,34 @@ function buildChecklistProtobuf(items: Array<{ text: string; done: boolean }>): 
 
   return new Uint8Array(noteWrapper);
 }
+
+describe("hasFullDiskAccess", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns true when database is accessible", () => {
+    mockExistsSync.mockReturnValue(true);
+    mockExecSync.mockReturnValue("1\n" as never);
+
+    expect(hasFullDiskAccess()).toBe(true);
+  });
+
+  it("returns false when database file does not exist", () => {
+    mockExistsSync.mockReturnValue(false);
+
+    expect(hasFullDiskAccess()).toBe(false);
+  });
+
+  it("returns false when sqlite3 query fails", () => {
+    mockExistsSync.mockReturnValue(true);
+    mockExecSync.mockImplementation(() => {
+      throw new Error("authorization denied");
+    });
+
+    expect(hasFullDiskAccess()).toBe(false);
+  });
+});
 
 describe("getChecklistItems", () => {
   beforeEach(() => {
