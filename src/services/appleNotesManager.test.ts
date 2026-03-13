@@ -16,7 +16,7 @@ import {
   AppleNotesManager,
   escapeForAppleScript,
   escapeHtmlForAppleScript,
-  formatAppleScriptDate,
+  buildAppleScriptDateVar,
   parseAppleScriptDate,
 } from "./appleNotesManager.js";
 
@@ -262,32 +262,42 @@ describe("parseAppleScriptDate", () => {
 });
 
 // =============================================================================
-// formatAppleScriptDate Tests
+// buildAppleScriptDateVar Tests
 // =============================================================================
 
-describe("formatAppleScriptDate", () => {
-  it("formats a date in AppleScript-compatible format", () => {
+describe("buildAppleScriptDateVar", () => {
+  it("generates locale-safe AppleScript date setup code", () => {
     const date = new Date(2025, 5, 15, 14, 30, 0); // June 15, 2025 2:30 PM
-    const result = formatAppleScriptDate(date);
-    expect(result).toBe("6/15/2025 2:30:00 PM");
+    const result = buildAppleScriptDateVar(date);
+    expect(result).toContain("set thresholdDate to current date");
+    expect(result).toContain("set year of thresholdDate to 2025");
+    expect(result).toContain("set month of thresholdDate to 6");
+    expect(result).toContain("set day of thresholdDate to 15");
+    // 14*3600 + 30*60 = 52200
+    expect(result).toContain("set time of thresholdDate to 52200");
   });
 
-  it("formats midnight as 12:00:00 AM", () => {
+  it("handles midnight (time = 0)", () => {
     const date = new Date(2025, 0, 1, 0, 0, 0); // Jan 1, 2025 midnight
-    const result = formatAppleScriptDate(date);
-    expect(result).toBe("1/1/2025 12:00:00 AM");
+    const result = buildAppleScriptDateVar(date);
+    expect(result).toContain("set month of thresholdDate to 1");
+    expect(result).toContain("set day of thresholdDate to 1");
+    expect(result).toContain("set time of thresholdDate to 0");
   });
 
-  it("formats noon as 12:00:00 PM", () => {
-    const date = new Date(2025, 0, 1, 12, 0, 0); // Jan 1, 2025 noon
-    const result = formatAppleScriptDate(date);
-    expect(result).toBe("1/1/2025 12:00:00 PM");
+  it("uses custom variable name", () => {
+    const date = new Date(2025, 0, 1, 0, 0, 0);
+    const result = buildAppleScriptDateVar(date, "myDate");
+    expect(result).toContain("set myDate to current date");
+    expect(result).toContain("set year of myDate to 2025");
+    expect(result).toContain("set month of myDate to 1");
   });
 
-  it("pads minutes and seconds", () => {
-    const date = new Date(2025, 11, 25, 9, 5, 3); // Dec 25, 2025 9:05:03 AM
-    const result = formatAppleScriptDate(date);
-    expect(result).toBe("12/25/2025 9:05:03 AM");
+  it("calculates time in seconds correctly", () => {
+    const date = new Date(2025, 11, 25, 9, 5, 3); // 9:05:03 AM
+    const result = buildAppleScriptDateVar(date);
+    // 9*3600 + 5*60 + 3 = 32703
+    expect(result).toContain("set time of thresholdDate to 32703");
   });
 });
 
@@ -564,10 +574,15 @@ describe("AppleNotesManager", () => {
         output: "Recent Note|||x-coredata://ABC/ICNote/p1|||Notes",
       });
 
-      manager.searchNotes("note", false, undefined, undefined, "2025-06-15");
+      manager.searchNotes("note", false, undefined, undefined, "2025-06-15T00:00:00");
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
-      expect(script).toContain("modification date >=");
+      // Locale-safe: uses variable setup instead of date "string"
+      expect(script).toContain("set thresholdDate to current date");
+      expect(script).toContain("set year of thresholdDate to 2025");
+      expect(script).toContain("set month of thresholdDate to 6");
+      expect(script).toContain("set day of thresholdDate to 15");
+      expect(script).toContain("modification date >= thresholdDate");
       expect(script).toContain('name contains "note"');
     });
 
@@ -581,7 +596,8 @@ describe("AppleNotesManager", () => {
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
       expect(script).toContain('body contains "keyword"');
-      expect(script).toContain("modification date >=");
+      expect(script).toContain("set thresholdDate to current date");
+      expect(script).toContain("modification date >= thresholdDate");
     });
 
     it("ignores invalid modifiedSince date", () => {
@@ -619,7 +635,8 @@ describe("AppleNotesManager", () => {
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
       expect(script).toContain('body contains "project"');
-      expect(script).toContain("modification date >=");
+      expect(script).toContain("set thresholdDate to current date");
+      expect(script).toContain("modification date >= thresholdDate");
       expect(script).toContain('notes of folder "Work"');
       expect(script).toContain("(count of resultList) >= 10");
       expect(script).toContain('tell account "iCloud"');
@@ -1121,17 +1138,21 @@ describe("AppleNotesManager", () => {
       );
     });
 
-    it("uses repeat loop when modifiedSince is provided", () => {
+    it("uses whose clause when modifiedSince is provided", () => {
       mockExecuteAppleScript.mockReturnValue({
         success: true,
         output: "Recent Note 1|||Recent Note 2",
       });
 
-      const results = manager.listNotes(undefined, undefined, "2025-06-01");
+      const results = manager.listNotes(undefined, undefined, "2025-06-15T00:00:00");
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
-      expect(script).toContain("modification date");
-      expect(script).toContain("exit repeat");
+      // Locale-safe: uses variable setup + whose clause (no sort order assumption)
+      expect(script).toContain("set thresholdDate to current date");
+      expect(script).toContain("set year of thresholdDate to 2025");
+      expect(script).toContain("set month of thresholdDate to 6");
+      expect(script).toContain("set day of thresholdDate to 15");
+      expect(script).toContain("whose modification date >= thresholdDate");
       expect(results).toEqual(["Recent Note 1", "Recent Note 2"]);
     });
 
@@ -1157,8 +1178,8 @@ describe("AppleNotesManager", () => {
       manager.listNotes("iCloud", "Work", "2025-01-01", 10);
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
+      expect(script).toContain("whose modification date >= thresholdDate");
       expect(script).toContain('notes of folder "Work"');
-      expect(script).toContain("modification date");
       expect(script).toContain("(count of resultList) >= 10");
     });
 
@@ -1182,7 +1203,7 @@ describe("AppleNotesManager", () => {
       const results = manager.listNotes(undefined, undefined, "not-a-date", 5);
 
       const script = mockExecuteAppleScript.mock.calls[0][0];
-      expect(script).not.toContain("modification date");
+      expect(script).not.toContain("thresholdDate");
       expect(script).toContain("(count of resultList) >= 5");
       expect(results).toEqual(["Note 1", "Note 2"]);
     });

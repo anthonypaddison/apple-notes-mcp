@@ -98,10 +98,15 @@ This is more reliable than trying to fix the whitespace through updates, as the 
 - Set `searchContent: true` to search note body, not just titles
 - Searches are case-insensitive
 - Results include note IDs for reliable subsequent operations
+- Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes — useful for large collections
+- Use `limit` to cap the number of results returned
+- Use `folder` to restrict search to a specific folder
 
 ### list-notes
 - Returns note titles only, not content
 - Use `get-note-content` to retrieve full content
+- Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes
+- Use `limit` to cap the number of notes returned
 
 ### move-note
 - Internally copies then deletes the original

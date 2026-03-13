@@ -178,30 +178,32 @@ export function parseAppleScriptDate(appleScriptDate: string): Date {
 }
 
 /**
- * Formats a JavaScript Date into a string suitable for AppleScript date comparisons.
+ * Generates AppleScript code that creates a date variable with the given values.
  *
- * AppleScript can parse dates in the format "MM/DD/YYYY HH:MM:SS AM/PM"
- * when used with the `date` keyword in comparisons.
+ * This approach is locale-independent, unlike `date "M/D/YYYY"` coercion which
+ * depends on the system's date format settings and would fail on non-US locales.
  *
- * @param date - JavaScript Date object to format
- * @returns Date string formatted for AppleScript
+ * @param date - JavaScript Date object
+ * @param varName - AppleScript variable name to assign (default: "thresholdDate")
+ * @returns AppleScript code that sets up the date variable
  *
  * @example
- * formatAppleScriptDate(new Date("2025-06-15T00:00:00"))
- * // Returns: "6/15/2025 12:00:00 AM"
+ * buildAppleScriptDateVar(new Date("2025-06-15T00:00:00"))
+ * // Returns multi-line AppleScript that sets thresholdDate to June 15, 2025 midnight
  */
-export function formatAppleScriptDate(date: Date): string {
+export function buildAppleScriptDateVar(date: Date, varName: string = "thresholdDate"): string {
+  const year = date.getFullYear();
   const month = date.getMonth() + 1;
   const day = date.getDate();
-  const year = date.getFullYear();
-  let hours = date.getHours();
-  const minutes = date.getMinutes();
-  const seconds = date.getSeconds();
-  const ampm = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12 || 12;
+  const timeInSeconds = date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
 
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${month}/${day}/${year} ${hours}:${pad(minutes)}:${pad(seconds)} ${ampm}`;
+  return [
+    `set ${varName} to current date`,
+    `set year of ${varName} to ${year}`,
+    `set month of ${varName} to ${month}`,
+    `set day of ${varName} to ${day}`,
+    `set time of ${varName} to ${timeInSeconds}`,
+  ].join("\n");
 }
 
 /**
@@ -581,6 +583,7 @@ export class AppleNotesManager {
   ): Note[] {
     const targetAccount = this.resolveAccount(account);
     const safeQuery = escapeForAppleScript(query);
+    const safeLimit = limit !== undefined && limit > 0 ? Math.floor(limit) : undefined;
 
     // Build the where clause based on search type
     // AppleScript uses 'name' for title and 'body' for content
@@ -592,11 +595,13 @@ export class AppleNotesManager {
       whereParts.push(`name contains "${safeQuery}"`);
     }
 
-    // Add date filter if specified
+    // Add date filter if specified (uses locale-safe date variable)
+    let dateSetup = "";
     if (modifiedSince) {
       const date = new Date(modifiedSince);
       if (!isNaN(date.getTime())) {
-        whereParts.push(`modification date >= date "${formatAppleScriptDate(date)}"`);
+        dateSetup = buildAppleScriptDateVar(date) + "\n";
+        whereParts.push(`modification date >= thresholdDate`);
       }
     }
 
@@ -606,17 +611,19 @@ export class AppleNotesManager {
     const notesSource = folder ? `notes of folder "${escapeForAppleScript(folder)}"` : "notes";
 
     // Build the limit logic for the repeat loop
+    // Note: The limit only reduces iteration over already-matched results from the whose clause,
+    // not the query itself. It controls output size, not AppleScript query performance.
     const limitCheck =
-      limit !== undefined && limit > 0
+      safeLimit !== undefined
         ? `
-          if (count of resultList) >= ${limit} then exit repeat`
+          if (count of resultList) >= ${safeLimit} then exit repeat`
         : "";
 
     // Get names, IDs, and folder for each matching note
     // We use a repeat loop to get all properties, separated by a delimiter
     // Note: Some notes may have inaccessible containers, so we wrap in try/on error
     const searchCommand = `
-      set matchingNotes to ${notesSource} where ${whereClause}
+      ${dateSetup}set matchingNotes to ${notesSource} where ${whereClause}
       set resultList to {}
       repeat with n in matchingNotes${limitCheck}
         try
@@ -996,34 +1003,35 @@ export class AppleNotesManager {
    */
   listNotes(account?: string, folder?: string, modifiedSince?: string, limit?: number): string[] {
     const targetAccount = this.resolveAccount(account);
+    const safeLimit = limit !== undefined && limit > 0 ? Math.floor(limit) : undefined;
 
     // When date or limit filters are needed, use a repeat loop for fine-grained control
-    if (modifiedSince || (limit !== undefined && limit > 0)) {
-      const notesSource = folder ? `notes of folder "${escapeForAppleScript(folder)}"` : "notes";
+    if (modifiedSince || safeLimit !== undefined) {
+      const baseNotesSource = folder
+        ? `notes of folder "${escapeForAppleScript(folder)}"`
+        : "notes";
 
-      // Build the date filter condition
-      let dateCondition = "";
+      // Use whose clause for date filtering (locale-safe, no sort order assumption)
+      let dateSetup = "";
+      let notesSource = baseNotesSource;
       if (modifiedSince) {
         const date = new Date(modifiedSince);
         if (!isNaN(date.getTime())) {
-          dateCondition = `
-            if modification date of n < date "${formatAppleScriptDate(date)}" then
-              -- Notes are sorted by modification date (newest first), so stop early
-              exit repeat
-            end if`;
+          dateSetup = buildAppleScriptDateVar(date) + "\n";
+          notesSource = `(${baseNotesSource} whose modification date >= thresholdDate)`;
         }
       }
 
       // Build the limit check
       const limitCheck =
-        limit !== undefined && limit > 0
+        safeLimit !== undefined
           ? `
-            if (count of resultList) >= ${limit} then exit repeat`
+            if (count of resultList) >= ${safeLimit} then exit repeat`
           : "";
 
       const listCommand = `
-        set resultList to {}
-        repeat with n in ${notesSource}${limitCheck}${dateCondition}
+        ${dateSetup}set resultList to {}
+        repeat with n in ${notesSource}${limitCheck}
           set end of resultList to name of n
         end repeat
         set AppleScript's text item delimiters to "|||"

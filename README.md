@@ -143,6 +143,9 @@ Searches for notes by title or content.
 | `query` | string | Yes | Text to search for |
 | `searchContent` | boolean | No | If `true`, searches note body; if `false` (default), searches titles only |
 | `account` | string | No | Account to search in (defaults to iCloud) |
+| `folder` | string | No | Limit search to a specific folder |
+| `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
+| `limit` | number | No | Maximum number of results to return |
 
 **Example - Search titles:**
 ```json
@@ -156,6 +159,16 @@ Searches for notes by title or content.
 {
   "query": "budget allocation",
   "searchContent": true
+}
+```
+
+**Example - Search recent notes with limit:**
+```json
+{
+  "query": "todo",
+  "searchContent": true,
+  "modifiedSince": "2025-01-01",
+  "limit": 10
 }
 ```
 
@@ -356,12 +369,14 @@ Moves a note to a different folder.
 
 #### `list-notes`
 
-Lists all notes, optionally filtered by folder.
+Lists all notes, optionally filtered by folder, date, and limit.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `account` | string | No | Account to list notes from (defaults to iCloud) |
 | `folder` | string | No | Filter to notes in this folder only |
+| `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
+| `limit` | number | No | Maximum number of notes to return |
 
 **Example - All notes:**
 ```json
@@ -372,6 +387,14 @@ Lists all notes, optionally filtered by folder.
 ```json
 {
   "folder": "Work"
+}
+```
+
+**Example - Recent notes with limit:**
+```json
+{
+  "modifiedSince": "2025-06-01",
+  "limit": 20
 }
 ```
 
