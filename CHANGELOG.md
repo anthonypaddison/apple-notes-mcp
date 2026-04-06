@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-06
+
+### Added
+- **Hierarchical folder paths** — `list-folders` now returns full paths (e.g., `Work/Clients/Omnia`) using folder IDs to disambiguate duplicates
+- **Nested folder support** — `create-note`, `search-notes`, `list-notes`, `move-note`, and `delete-folder` all accept nested paths like `"Work/Clients"`
+- **`folder` and `account` parameters on `create-note`** — Create notes directly in a specific folder and account
+- **Literal slash escaping** — Folder names containing `/` are escaped as `\/` in paths (e.g., `Spain\/Portugal 2023`)
+- **Folder IDs** — `list-folders` now includes the CoreData ID for each folder
+- **Input length validation** — Titles (2K), content (5MB), folder paths (1K), account names (200 chars), and folder nesting depth (20 levels) are all validated
+- **Security tests** — Injection payloads, malformed IDs, boundary conditions for folder paths
+
+### Security
+- **CoreData ID validation** — New `sanitizeId()` validates ID format with regex before embedding in AppleScript, preventing injection via crafted IDs
+- **Account name sanitization** — Account names are now escaped in `buildAccountScopedScript()` to prevent AppleScript injection
+- **Defense-in-depth** — All ID-based methods (`getNoteById`, `getNoteContentById`, `deleteNoteById`, `updateNoteById`, `moveNoteById`, `listAttachmentsById`) now validate and escape IDs
+
+### Changed
+- **Rewrote `listSharedNotes()` output parsing** — Switched from fragile regex/comma-based parsing to delimited `|||` output, fixing potential breakage when note titles contain commas or braces
+
+### Contributors
+- Rob Schmitt ([@robschmitt](https://github.com/robschmitt)) — Hierarchical folder paths and nested folder support (PR #8)
+
 ## [1.3.1] - 2026-03-27
 
 ### Changed

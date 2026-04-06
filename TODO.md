@@ -1,6 +1,6 @@
 # Apple Notes MCP - Improvement Roadmap
 
-*As of v1.2.18*
+*As of v1.4.0*
 
 Based on technical research into Apple Notes internals and analysis of other implementations, here are remaining improvements.
 
