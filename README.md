@@ -77,13 +77,13 @@ On first use, macOS will ask for permission to automate Notes.app. Click "OK" to
 
 | Feature | Description |
 |---------|-------------|
-| **Create Notes** | Create notes with titles, content, and optional organization |
+| **Create Notes** | Create notes with titles, content, and optional folder/account targeting |
 | **Search Notes** | Find notes by title or search within note content |
 | **Read Notes** | Retrieve note content and metadata |
 | **Update Notes** | Modify existing notes (title and/or content) |
 | **Delete Notes** | Remove notes (moves to Recently Deleted) |
-| **Move Notes** | Organize notes into folders |
-| **Folder Management** | Create, list, and delete folders |
+| **Move Notes** | Organize notes into folders (supports nested paths) |
+| **Folder Management** | Create, list, and delete folders with full hierarchical path support |
 | **Multi-Account** | Work with iCloud, Gmail, Exchange, or any configured account |
 | **Batch Operations** | Delete or move multiple notes at once |
 | **Checklist State** | Read checklist done/undone state directly from the Notes database |
@@ -110,6 +110,8 @@ Creates a new note in Apple Notes.
 | `title` | string | Yes | The title of the note. Automatically prepended as `<h1>` — do NOT include the title in `content` |
 | `content` | string | Yes | The body content of the note (do not repeat the title here) |
 | `tags` | string[] | No | Tags for organization (stored in metadata) |
+| `folder` | string | No | Folder to create the note in. Supports nested paths like `"Work/Clients"`. Defaults to account root |
+| `account` | string | No | Account name (defaults to iCloud) |
 | `format` | string | No | Content format: `"plaintext"` (default) or `"html"`. In both formats, the title is automatically prepended as `<h1>`. In plaintext mode, newlines become `<br>`, tabs become `<br>`, and backslashes are preserved as HTML entities |
 
 **Example:**
@@ -118,6 +120,15 @@ Creates a new note in Apple Notes.
   "title": "Meeting Notes",
   "content": "Discussed Q4 roadmap and budget allocation",
   "tags": ["work", "meetings"]
+}
+```
+
+**Example - Create in a specific folder:**
+```json
+{
+  "title": "Client Meeting",
+  "content": "Discussed project timeline",
+  "folder": "Work/Clients"
 }
 ```
 
@@ -145,7 +156,7 @@ Searches for notes by title or content.
 | `query` | string | Yes | Text to search for |
 | `searchContent` | boolean | No | If `true`, searches note body; if `false` (default), searches titles only |
 | `account` | string | No | Account to search in (defaults to iCloud) |
-| `folder` | string | No | Limit search to a specific folder |
+| `folder` | string | No | Limit search to a specific folder (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
 | `limit` | number | No | Maximum number of results to return |
 
@@ -342,7 +353,7 @@ Moves a note to a different folder.
 |-----------|------|----------|-------------|
 | `id` | string | No | Note ID (preferred - more reliable than title) |
 | `title` | string | No | Title of the note to move (use `id` instead when available) |
-| `folder` | string | Yes | Name of the destination folder |
+| `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`) |
 | `account` | string | No | Account containing the note (defaults to iCloud, ignored if `id` is provided) |
 
 **Note:** Either `id` or `title` must be provided. Using `id` is recommended.
@@ -376,7 +387,7 @@ Lists all notes, optionally filtered by folder, date, and limit.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `account` | string | No | Account to list notes from (defaults to iCloud) |
-| `folder` | string | No | Filter to notes in this folder only |
+| `folder` | string | No | Filter to notes in this folder only (supports nested paths like `"Work/Clients"`) |
 | `modifiedSince` | string | No | ISO 8601 date string to filter notes modified on or after this date (e.g., `"2025-01-01"`) |
 | `limit` | number | No | Maximum number of notes to return |
 
@@ -408,7 +419,7 @@ Lists all notes, optionally filtered by folder, date, and limit.
 
 #### `list-folders`
 
-Lists all folders in an account.
+Lists all folders in an account with full hierarchical paths.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -419,7 +430,7 @@ Lists all folders in an account.
 {}
 ```
 
-**Returns:** List of folder names.
+**Returns:** List of folder paths. Nested folders are shown as full paths (e.g., `Work/Clients/Omnia`). Duplicate folder names are disambiguated by their full path. Literal slashes in folder names are escaped as `\/` (e.g., `Spain\/Portugal 2023`).
 
 ---
 
@@ -449,7 +460,7 @@ Deletes a folder.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | Yes | Name of the folder to delete |
+| `name` | string | Yes | Name or path of the folder to delete (supports nested paths like `"Work/Old"`) |
 | `account` | string | No | Account containing the folder (defaults to iCloud) |
 
 **Example:**
@@ -501,7 +512,7 @@ Moves multiple notes to a folder.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `ids` | string[] | Yes | Array of note IDs to move |
-| `folder` | string | Yes | Destination folder name |
+| `folder` | string | Yes | Destination folder name or nested path (e.g., `"Work/Clients"`) |
 | `account` | string | No | Account containing the folder |
 
 **Returns:** Summary of successes and failures.
@@ -660,6 +671,14 @@ AI: [calls create-folder with name="Archive"]
 User: "Move my old meeting notes to Archive"
 AI: [calls move-note with title="Old Meeting Notes", folder="Archive"]
     "Moved 'Old Meeting Notes' to 'Archive'"
+
+User: "What folders do I have?"
+AI: [calls list-folders]
+    "You have 5 folders: Work, Work/Clients, Work/Clients/Omnia, Archive, Recipes"
+
+User: "Create a note in Work/Clients about Acme Corp"
+AI: [calls create-note with title="Acme Corp", content="...", folder="Work/Clients"]
+    "Created 'Acme Corp' in Work/Clients"
 ```
 
 ---
@@ -793,7 +812,7 @@ The `\\\\` in JSON becomes `\\` in the actual string, which represents a single 
 ```bash
 npm install      # Install dependencies
 npm run build    # Compile TypeScript
-npm test         # Run test suite (217 tests)
+npm test         # Run test suite (310 tests)
 npm run lint     # Check code style
 npm run format   # Format code
 ```

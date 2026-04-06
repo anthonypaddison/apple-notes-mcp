@@ -95,13 +95,25 @@ delete-note id="x-coredata://ABC/ICNote/p123"
 
 This is more reliable than trying to fix the whitespace through updates, as the artifacts are baked into the note's internal representation.
 
+### Folder Paths (Nested Folder Support)
+
+All folder operations support hierarchical paths using `/` as a separator:
+- `"Work"` — simple folder name
+- `"Work/Clients"` — nested path (folder "Clients" inside "Work")
+- `"Work/Clients/Omnia"` — deeply nested path
+- `"Travel/Spain\/Portugal 2023"` — literal slash in folder name escaped as `\/`
+
+This works in: `create-note` (folder param), `search-notes`, `list-notes`, `move-note`, `delete-folder`.
+
+`list-folders` returns full hierarchical paths, so duplicate folder names (e.g., multiple "Archive" folders) are disambiguated.
+
 ### search-notes
 - Set `searchContent: true` to search note body, not just titles
 - Searches are case-insensitive
 - Results include note IDs for reliable subsequent operations
 - Use `modifiedSince` (ISO 8601 date) to filter to recently modified notes — useful for large collections
 - Use `limit` to cap the number of results returned
-- Use `folder` to restrict search to a specific folder
+- Use `folder` to restrict search to a specific folder (supports nested paths)
 
 ### list-notes
 - Returns note titles only, not content
