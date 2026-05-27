@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-05-27
+
+### Added
+- **Runtime warning for unsupported checklist content** — `create-note` and `update-note` now detect checklist-like input (`<input type="checkbox">`, `class="checklist"|"todo"`, markdown `- [ ]` / `* [ ]` lines) and append a warning to the success response explaining that AppleScript cannot produce real Apple Notes checklists, so the failure mode is no longer silent
+- **`detectChecklistAttempt()` utility** in `src/utils/contentWarnings.ts` with 14 unit tests
+
+### Documentation
+- **New "Creating Checklists" section in README** — explains why checklist creation is impossible via AppleScript (Apple Notes stores checklists as protobuf paragraph style `103`, which the scripting interface doesn't expose) and documents the ⇧⌘L manual-conversion workaround
+- **New "Checklist Creation Is Not Supported" section in CLAUDE.md** — explicit guidance so AI agents stop trying alternative HTML class names, data attributes, or Unicode characters
+- **Tool schema descriptions** — `create-note.content` and `update-note.newContent` now mention the checklist limitation so it surfaces in MCP tool listings
+- **Known Limitations table** — added a row for checklist creation alongside the existing checklist-state read row
+
+### Fixes Issues
+- Closes #11 — "Can't create notes with Checklists (possibly a documentation issue)"
+
 ## [1.4.1] - 2026-04-06
 
 ### Fixed
