@@ -42,7 +42,12 @@ describe("outputSchema contract (real server over stdio)", () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [SERVER],
-      env: { ...process.env } as Record<string, string>,
+      env: {
+        ...process.env,
+        APPLE_NOTES_MCP_ALLOW_READ: "true",
+        APPLE_NOTES_MCP_ALLOW_WRITE: "true",
+        APPLE_NOTES_MCP_ALLOW_DESTRUCTIVE: "true",
+      } as Record<string, string>,
     });
     client = new Client({ name: "outputschema-contract-test", version: "0.0.0" });
     await client.connect(transport);
@@ -57,6 +62,34 @@ describe("outputSchema contract (real server over stdio)", () => {
     expect(tools.length).toBeGreaterThan(0);
     const missing = tools.filter((t) => !t.outputSchema).map((t) => t.name);
     expect(missing, `tools missing an outputSchema: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("registers only read tools when write and destructive permissions are disabled", async () => {
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [SERVER],
+      env: {
+        ...process.env,
+        APPLE_NOTES_MCP_ALLOW_READ: "true",
+        APPLE_NOTES_MCP_ALLOW_WRITE: "false",
+        APPLE_NOTES_MCP_ALLOW_DESTRUCTIVE: "false",
+      } as Record<string, string>,
+    });
+    const readOnlyClient = new Client({ name: "permissions-contract-test", version: "0.0.0" });
+    await readOnlyClient.connect(transport);
+    try {
+      const { tools } = await readOnlyClient.listTools();
+      const names = tools.map((tool) => tool.name);
+
+      expect(names).toContain("get-note-content");
+      expect(names).toContain("show-note");
+      expect(names).not.toContain("create-note");
+      expect(names).not.toContain("save-attachment");
+      expect(names).not.toContain("delete-note");
+      expect(names).toHaveLength(26);
+    } finally {
+      await readOnlyClient.close();
+    }
   });
 
   it("every outputSchema is permissive — no required fields", async () => {
