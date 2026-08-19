@@ -215,6 +215,12 @@ describe("Guard B — the README Tool Reference matches the advertised tool surf
       encoding: "utf8",
       timeout: 60_000,
       maxBuffer: 64 * 1024 * 1024,
+      env: {
+        ...process.env,
+        APPLE_NOTES_MCP_ALLOW_READ: "true",
+        APPLE_NOTES_MCP_ALLOW_WRITE: "true",
+        APPLE_NOTES_MCP_ALLOW_DESTRUCTIVE: "true",
+      },
     });
 
     const detail = `exit=${proc.status} signal=${proc.signal} stderr=${(proc.stderr || "").slice(-2000)}`;
