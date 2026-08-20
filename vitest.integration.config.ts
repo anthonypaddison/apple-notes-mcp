@@ -9,6 +9,14 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["test/**/*.test.ts"],
+    // Live AppleScript calls are synchronous and can block the worker longer
+    // than Vitest's fork RPC update deadline. A single thread keeps the live
+    // suite in-process and avoids a false unhandled-worker-timeout after the
+    // tests themselves have completed.
+    pool: "threads",
+    poolOptions: {
+      threads: { singleThread: true },
+    },
     testTimeout: 120_000,
     // vitest 3 enforces a separate hookTimeout (default 10s). The integration
     // suite's beforeAll probes Notes.app via AppleScript, which hangs ~25s on a
