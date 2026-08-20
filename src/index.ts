@@ -42,16 +42,24 @@ import { describeSearchScope } from "@/utils/searchScope.js";
 import { runDoctor, formatDoctorReport } from "@/tools/doctor.js";
 import { FULL_DISK_ACCESS_GUIDE_URL } from "@/utils/docsUrls.js";
 import { loadFileConfig } from "@/services/fileConfig.js";
+import { allowedToolNames, resolvePermissions, toolPermission } from "@/services/permissions.js";
 import { registerResourcesAndPrompts } from "@/tools/resourcesAndPrompts.js";
 import { withJsonSchema2020_12 } from "@/utils/jsonSchemaDialect.js";
 
 // Load file-based config FIRST (#24) — before anything reads APPLE_NOTES_MCP_*.
 // Lets users configure the server when the host app strips the MCP env block.
 loadFileConfig();
+const permissions = resolvePermissions();
 
 // Read version from package.json to keep it in sync
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
+const runtimeIdentity = {
+  derivative: "anthonypaddison/apple-notes-mcp",
+  version,
+  permissions,
+  toolCount: allowedToolNames(permissions).length,
+};
 
 // =============================================================================
 // Server Initialization
@@ -221,7 +229,9 @@ function registerTool<
     annotations?: ToolAnnotations;
   },
   cb: ToolCallback<InputArgs>
-): RegisteredTool {
+): RegisteredTool | undefined {
+  const permission = toolPermission(name);
+  if (!permission || !permissions[permission]) return undefined;
   const { outputSchema, ...rest } = config;
   return server.registerTool(
     name,
@@ -1668,6 +1678,7 @@ registerTool(
       healthy: z.boolean().optional(),
       checks: z.array(z.object({}).passthrough()).optional(),
       fullDiskAccess: z.boolean().optional(),
+      runtime: z.object({}).passthrough().optional(),
     },
   },
   withErrorHandling(() => {
@@ -1698,6 +1709,7 @@ registerTool(
       healthy: result.healthy,
       checks: result.checks,
       fullDiskAccess: fdaAvailable,
+      runtime: runtimeIdentity,
     });
   }, "Error running health check")
 );
@@ -2284,7 +2296,7 @@ registerTool(
  * This is the standard transport for CLI-based MCP servers.
  */
 // Register read-only resources and workflow prompts (#23).
-registerResourcesAndPrompts(server, notesManager);
+registerResourcesAndPrompts(server, notesManager, permissions);
 
 // Defense-in-depth: an unhandled rejection or a stray EventEmitter "error" must
 // never take down this long-lived MCP server. EPIPE on stdout means the MCP
