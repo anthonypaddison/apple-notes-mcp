@@ -42205,11 +42205,74 @@ function loadFileConfig(env = process.env, path4 = fileConfigPath(env)) {
   return applied;
 }
 
+// src/services/permissions.ts
+var ENVIRONMENT_KEYS = {
+  read: "APPLE_NOTES_MCP_ALLOW_READ",
+  write: "APPLE_NOTES_MCP_ALLOW_WRITE",
+  destructive: "APPLE_NOTES_MCP_ALLOW_DESTRUCTIVE"
+};
+var TOOL_PERMISSIONS = {
+  "create-note": "write",
+  "search-notes": "read",
+  "get-note-content": "read",
+  "get-note-plaintext": "read",
+  "get-note-by-id": "read",
+  "get-note-details": "read",
+  "show-note": "read",
+  "get-note-link": "read",
+  "show-folder": "read",
+  "show-account": "read",
+  "update-note": "write",
+  "append-to-note": "write",
+  "delete-note": "destructive",
+  "move-note": "write",
+  "list-notes": "read",
+  "get-selected-notes": "read",
+  "list-folders": "read",
+  "create-folder": "write",
+  "delete-folder": "destructive",
+  "list-accounts": "read",
+  "get-default-location": "read",
+  "list-shared-notes": "read",
+  "get-sync-status": "read",
+  "health-check": "read",
+  doctor: "read",
+  "get-notes-stats": "read",
+  "list-attachments": "read",
+  "batch-delete-notes": "destructive",
+  "batch-move-notes": "write",
+  "save-attachment": "write",
+  "fetch-attachment": "read",
+  "show-attachment": "read",
+  "export-notes-json": "read",
+  "get-note-markdown": "read",
+  "get-checklist-state": "read",
+  "get-note-metadata": "read"
+};
+function readCapability(env, key, defaultValue) {
+  const value = env[key];
+  return value === void 0 ? defaultValue : value === "true";
+}
+function resolvePermissions(env = process.env) {
+  return {
+    read: readCapability(env, ENVIRONMENT_KEYS.read, true),
+    write: readCapability(env, ENVIRONMENT_KEYS.write, false),
+    destructive: readCapability(env, ENVIRONMENT_KEYS.destructive, false)
+  };
+}
+function toolPermission(name) {
+  return TOOL_PERMISSIONS[name];
+}
+function allowedToolNames(permissions2) {
+  return Object.entries(TOOL_PERMISSIONS).filter(([, permission]) => permissions2[permission]).map(([name]) => name);
+}
+
 // src/tools/resourcesAndPrompts.ts
 var json = (uri, data) => ({
   contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(data, null, 2) }]
 });
-function registerResourcesAndPrompts(server2, manager) {
+function registerResourcesAndPrompts(server2, manager, permissions2 = { read: true, write: true, destructive: true }) {
+  if (!permissions2.read) return;
   server2.resource(
     "accounts",
     "notes://accounts",
@@ -42258,26 +42321,28 @@ function registerResourcesAndPrompts(server2, manager) {
       }
     ]
   }));
-  server2.prompt(
-    "new-meeting-note",
-    "Draft and create a structured meeting note",
-    {
-      subject: external_exports.string().describe("Meeting subject"),
-      attendees: external_exports.string().optional().describe("Comma-separated attendees"),
-      folder: external_exports.string().optional().describe("Target folder")
-    },
-    ({ subject, attendees, folder }) => ({
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: `Create an Apple Note titled "${subject}" ${folder ? `in folder "${folder}" ` : ""}using create-note (format: html). Include sections for Attendees${attendees ? ` (${attendees})` : ""}, Agenda, Discussion, and Action Items. Render Action Items as a plain bulleted list and remind me I can convert it to a checklist in Notes with \u21E7\u2318L.`
+  if (permissions2.write) {
+    server2.prompt(
+      "new-meeting-note",
+      "Draft and create a structured meeting note",
+      {
+        subject: external_exports.string().describe("Meeting subject"),
+        attendees: external_exports.string().optional().describe("Comma-separated attendees"),
+        folder: external_exports.string().optional().describe("Target folder")
+      },
+      ({ subject, attendees, folder }) => ({
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: `Create an Apple Note titled "${subject}" ${folder ? `in folder "${folder}" ` : ""}using create-note (format: html). Include sections for Attendees${attendees ? ` (${attendees})` : ""}, Agenda, Discussion, and Action Items. Render Action Items as a plain bulleted list and remind me I can convert it to a checklist in Notes with \u21E7\u2318L.`
+            }
           }
-        }
-      ]
-    })
-  );
+        ]
+      })
+    );
+  }
 }
 
 // src/utils/jsonSchemaDialect.ts
@@ -42393,8 +42458,15 @@ function withJsonSchema2020_12(transport2) {
 
 // src/index.ts
 loadFileConfig();
+var permissions = resolvePermissions();
 var require2 = createRequire(import.meta.url);
 var { version: version2 } = require2("../package.json");
+var runtimeIdentity = {
+  derivative: "anthonypaddison/apple-notes-mcp",
+  version: version2,
+  permissions,
+  toolCount: allowedToolNames(permissions).length
+};
 var server = new McpServer({
   name: "apple-notes",
   version: version2,
@@ -42448,6 +42520,8 @@ var folderNameSchema = {
   )
 };
 function registerTool(name, config2, cb) {
+  const permission = toolPermission(name);
+  if (!permission || !permissions[permission]) return void 0;
   const { outputSchema, ...rest } = config2;
   return server.registerTool(
     name,
@@ -43482,7 +43556,8 @@ registerTool(
     outputSchema: {
       healthy: external_exports.boolean().optional(),
       checks: external_exports.array(external_exports.object({}).passthrough()).optional(),
-      fullDiskAccess: external_exports.boolean().optional()
+      fullDiskAccess: external_exports.boolean().optional(),
+      runtime: external_exports.object({}).passthrough().optional()
     }
   },
   withErrorHandling(() => {
@@ -43501,7 +43576,8 @@ ${checkLines}
 ${fdaLine}`, {
       healthy: result.healthy,
       checks: result.checks,
-      fullDiskAccess: fdaAvailable
+      fullDiskAccess: fdaAvailable,
+      runtime: runtimeIdentity
     });
   }, "Error running health check")
 );
@@ -43910,7 +43986,7 @@ registerTool(
     return successResponse(summary, metadata);
   }, "Error reading note metadata")
 );
-registerResourcesAndPrompts(server, notesManager);
+registerResourcesAndPrompts(server, notesManager, permissions);
 process.on("uncaughtException", (err) => {
   if (err?.code === "EPIPE") process.exit(0);
   console.error("[uncaughtException]", err);

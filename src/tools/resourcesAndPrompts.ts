@@ -10,12 +10,19 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { AppleNotesManager } from "@/services/appleNotesManager.js";
+import type { Permissions } from "@/services/permissions.js";
 
 const json = (uri: URL, data: unknown) => ({
   contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(data, null, 2) }],
 });
 
-export function registerResourcesAndPrompts(server: McpServer, manager: AppleNotesManager): void {
+export function registerResourcesAndPrompts(
+  server: McpServer,
+  manager: AppleNotesManager,
+  permissions: Permissions = { read: true, write: true, destructive: true }
+): void {
+  if (!permissions.read) return;
+
   // --- Resources ---
   server.resource("accounts", "notes://accounts", (uri) =>
     json(uri, { accounts: manager.listAccounts() })
@@ -72,28 +79,30 @@ export function registerResourcesAndPrompts(server: McpServer, manager: AppleNot
     ],
   }));
 
-  server.prompt(
-    "new-meeting-note",
-    "Draft and create a structured meeting note",
-    {
-      subject: z.string().describe("Meeting subject"),
-      attendees: z.string().optional().describe("Comma-separated attendees"),
-      folder: z.string().optional().describe("Target folder"),
-    },
-    ({ subject, attendees, folder }) => ({
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: `Create an Apple Note titled "${subject}" ${
-              folder ? `in folder "${folder}" ` : ""
-            }using create-note (format: html). Include sections for Attendees${
-              attendees ? ` (${attendees})` : ""
-            }, Agenda, Discussion, and Action Items. Render Action Items as a plain bulleted list and remind me I can convert it to a checklist in Notes with ⇧⌘L.`,
+  if (permissions.write) {
+    server.prompt(
+      "new-meeting-note",
+      "Draft and create a structured meeting note",
+      {
+        subject: z.string().describe("Meeting subject"),
+        attendees: z.string().optional().describe("Comma-separated attendees"),
+        folder: z.string().optional().describe("Target folder"),
+      },
+      ({ subject, attendees, folder }) => ({
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: `Create an Apple Note titled "${subject}" ${
+                folder ? `in folder "${folder}" ` : ""
+              }using create-note (format: html). Include sections for Attendees${
+                attendees ? ` (${attendees})` : ""
+              }, Agenda, Discussion, and Action Items. Render Action Items as a plain bulleted list and remind me I can convert it to a checklist in Notes with ⇧⌘L.`,
+            },
           },
-        },
-      ],
-    })
-  );
+        ],
+      })
+    );
+  }
 }
