@@ -1,4 +1,4 @@
-# Contributing to Apple Notes MCP Server
+# Contributing to this Apple Notes MCP derivative
 
 Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
 
@@ -6,25 +6,25 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/sweetrb/apple-notes-mcp.git
+   git clone https://github.com/anthonypaddison/apple-notes-mcp.git
    cd apple-notes-mcp
    ```
 
 2. **Install dependencies**
    ```bash
-   pnpm install
+   corepack pnpm install --frozen-lockfile
    ```
 
-   This repo pins pnpm via `packageManager` in `package.json` — `corepack enable` provides it. Development needs Node >= 22.13 (CI tests on Node 22 and 24); the published server itself runs on Node >= 20.
+   This derivative pins pnpm via `packageManager` in `package.json`. The MCP server requires Node.js >= 20. Use Node.js >= 22.13 for development tooling, as declared by the repository's CI configuration.
 
 3. **Build the project**
    ```bash
-   pnpm run build
+   corepack pnpm run build
    ```
 
 4. **Run tests**
    ```bash
-   pnpm test
+   corepack pnpm test
    ```
 
 ## Code Style
@@ -47,7 +47,7 @@ pnpm run format:check
 
 ## Testing
 
-All new features should include tests. We use Vitest for testing.
+All new features should include tests. We use Vitest for testing. Unit tests mock AppleScript; do not run the live suite against a personal Notes library.
 
 ```bash
 # Run tests once
@@ -67,7 +67,7 @@ pnpm run test:watch
 
 1. **Create a feature branch**
    ```bash
-   git checkout -b feature/your-feature-name
+   git checkout -b ap-your-feature-name
    ```
 
 2. **Make your changes**
@@ -77,11 +77,11 @@ pnpm run test:watch
 
 3. **Run all checks**
    ```bash
-   pnpm run lint
-   pnpm run typecheck
-   pnpm run format:check
-   pnpm test
-   pnpm run build
+   corepack pnpm run lint
+   corepack pnpm run typecheck
+   corepack pnpm run format:check
+   corepack pnpm test
+   corepack pnpm run build
    ```
 
 4. **Version bump & committed bundle** (shipped-code changes only)

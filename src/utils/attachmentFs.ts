@@ -45,7 +45,7 @@ export function allowedSaveRoots(): string[] {
  * supplied; only `fs.realpathSync.native` returns the true on-disk name. macOS
  * APFS is case-insensitive by default, so without the native call an exact-case
  * comparison is defeated by respelling one segment — the same directory reached
- * as `/Users/rob/…` and `/users/rob/…` would canonicalize to two different
+ * as `/Users/example/…` and `/users/example/…` would canonicalize to two different
  * strings and only one of them would match a root.
  *
  * Both the candidate and the roots go through this, which also keeps the
@@ -60,8 +60,8 @@ function canonicalize(path: string): string {
  * True if `candidate` is one of `roots` or strictly inside one.
  *
  * The boundary is a path SEGMENT, not a string prefix: a bare `startsWith`
- * would admit a sibling whose name merely shares the prefix (`/Volumes-evil`
- * startsWith `/Volumes`; `/Users/robother` startsWith `/Users/rob`). Both
+ * would admit a sibling whose name merely shares the prefix (`/Volumes-example`
+ * startsWith `/Volumes`; `/Users/example-other` startsWith `/Users/example`). Both
  * arguments must already be absolute.
  */
 function isWithinRoots(candidate: string, roots: string[]): boolean {

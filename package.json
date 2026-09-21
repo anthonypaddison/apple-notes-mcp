@@ -2,7 +2,7 @@
   "name": "apple-notes-mcp",
   "version": "2.7.5",
   "packageManager": "pnpm@11.9.0",
-  "description": "MCP server for Apple Notes - create, search, update, and manage notes via Claude and other AI assistants",
+  "description": "Unofficial derivative of sweetrb/apple-notes-mcp with independently gated read, write, and destructive MCP capabilities",
   "type": "module",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -50,11 +50,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sweetrb/apple-notes-mcp.git"
+    "url": "git+https://github.com/anthonypaddison/apple-notes-mcp.git"
   },
-  "homepage": "https://github.com/sweetrb/apple-notes-mcp#readme",
+  "homepage": "https://github.com/anthonypaddison/apple-notes-mcp#readme",
   "bugs": {
-    "url": "https://github.com/sweetrb/apple-notes-mcp/issues"
+    "url": "https://github.com/anthonypaddison/apple-notes-mcp/issues"
   },
   "engines": {
     "node": ">=20.0.0"

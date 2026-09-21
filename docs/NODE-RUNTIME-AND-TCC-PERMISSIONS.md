@@ -1,4 +1,4 @@
-# Node runtime & TCC permission stability
+# Node runtime & TCC permission diagnostics
 
 macOS gates this MCP server's access to your data behind **TCC** permissions —
 **Full Disk Access** (to read app data such as Mail, Notes, or Photos) and
@@ -6,8 +6,10 @@ macOS gates this MCP server's access to your data behind **TCC** permissions —
 AppleScript). See this repo's Full Disk Access / Automation notes for *which*
 operations need which permission.
 
-This page is about a **separate, recurring annoyance**: being asked to approve
-those permissions **over and over**, often right after a routine `brew upgrade`.
+This page describes a reported permission-prompt pattern after runtime updates.
+The server's `doctor` tool inspects the Node executable's signature and warns
+when it is ad-hoc signed. That warning is diagnostic, not proof that replacing
+Node will fix every host's TCC behavior.
 
 ## Symptom
 
@@ -20,90 +22,39 @@ those permissions **over and over**, often right after a routine `brew upgrade`.
 
 ## Cause
 
-TCC binds a permission grant to the **code identity of the binary that performs
-the access** — here, the `node` executable that launches the MCP server. For a
-binary that is only **ad-hoc signed** (no Developer ID / Team ID), TCC keys the
-grant to the binary's **cdhash**, a hash of its contents.
+The `doctor` check treats an ad-hoc signature (no Team ID) as a possible source
+of repeated prompts when an executable changes. The responsible TCC identity
+and the item that must be granted can vary with macOS, the host application, and
+how the MCP process is launched. This repository has not verified a universal
+host-versus-Node rule or guaranteed persistence across runtime updates.
 
-Homebrew's `node` formula is ad-hoc signed:
+To inspect a Node binary, use the absolute path configured in your MCP host.
+The following read-only example uses a placeholder; resolving `node` from a
+terminal may inspect a different executable than the server uses:
 
 ```bash
-$ codesign -dvvv "$(which node)" 2>&1 | grep -E 'Signature|TeamIdentifier'
+NODE_EXECUTABLE="/absolute/path/to/the/configured/node"
+codesign -dvvv "$NODE_EXECUTABLE" 2>&1 | grep -E 'Signature|TeamIdentifier'
 Signature=adhoc
 TeamIdentifier=not set
 ```
 
-Every Node update **replaces the binary**, which **changes the cdhash**, so TCC
-no longer recognizes it as the thing you approved — and re-prompts. The extra
-"node" rows are stale cdhashes from previous versions.
+If it reports an ad-hoc signature, `doctor` will flag that condition. It does
+not establish that a particular macOS prompt or permission entry is caused by
+the signature; verify the actual host/runtime behavior before changing Node or
+granting additional access.
 
-By contrast, properly signed apps (Chrome, Slack, …) keep their permissions
-across auto-updates because TCC matches them on a stable **Designated
-Requirement** derived from their Developer ID, not on the cdhash.
+## Before changing the runtime
 
-## Fix: run the MCP under the official, Developer-ID-signed Node
+Do not replace a working Node installation or grant Full Disk Access to extra
+apps solely on the basis of the ad-hoc-signature warning. First use `doctor`,
+identify which process macOS associates with the denied operation, and verify
+whether a runtime change resolves the prompt on the target host and macOS
+version. See [Full Disk Access](FULL-DISK-ACCESS.md) for the database permission
+scope. Permission persistence is not guaranteed by this guide.
 
-Node binaries distributed from **nodejs.org** are signed with a real Developer
-ID (`Node.js Foundation`, Team `HX7739G8FX`), notarized, and self-contained.
-Pointing the MCP server at one gives TCC a **stable** identity to match, so a
-permission you grant **persists across future Node updates**. It also decouples
-the MCP runtime from your Homebrew/dev Node, which can keep updating freely.
-
-### Steps (Apple Silicon shown; use `darwin-x64` on Intel)
-
-1. Install a current LTS to a stable path (kept off `PATH` so it won't shadow
-   your dev Node):
-
-   ```bash
-   VER=v24.17.0 ARCH=darwin-arm64
-   mkdir -p ~/mcp-runtime && cd ~/mcp-runtime
-   curl -O https://nodejs.org/dist/$VER/node-$VER-$ARCH.tar.gz
-   curl -O https://nodejs.org/dist/$VER/SHASUMS256.txt
-   grep "  node-$VER-$ARCH.tar.gz$" SHASUMS256.txt | shasum -a 256 -c -   # must print OK
-   tar -xzf node-$VER-$ARCH.tar.gz
-   ln -sfn node-$VER-$ARCH node-current
-   ```
-
-2. Confirm it's Developer-ID signed:
-
-   ```bash
-   codesign -dvvv ~/mcp-runtime/node-current/bin/node 2>&1 | grep -E 'Authority=Developer ID|TeamIdentifier'
-   # Authority=Developer ID Application: Node.js Foundation (HX7739G8FX)
-   # TeamIdentifier=HX7739G8FX
-   ```
-
-3. Point this MCP server's launcher at it. For Claude Desktop, edit
-   `~/Library/Application Support/Claude/claude_desktop_config.json` and set this
-   server's `command` to the absolute path:
-
-   ```json
-   {
-     "mcpServers": {
-       "apple-notes": {
-         "command": "/Users/<you>/mcp-runtime/node-current/bin/node",
-         "args": ["/path/to/apple-notes-mcp/build/index.js"]
-       }
-     }
-   }
-   ```
-
-   Servers launched via `npx` that don't need Full Disk Access can stay on
-   Homebrew Node.
-
-4. **Restart your MCP client** so the server relaunches under the new Node.
-
-5. **Grant the permissions once** to the new binary:
-   - *Full Disk Access*: System Settings → Privacy & Security → Full Disk Access
-     → **+** → ⌘⇧G → paste `~/mcp-runtime/node-current/bin/node`.
-   - *Automation*: the first time the server drives an app you'll get a one-time
-     `"node" wants to control "<App>"` prompt — click **Allow**.
-
-   Both grants are keyed to the official Node's stable signature, so you should
-   not be asked again — including after future Node updates. You can delete the
-   stale "node" rows from the Full Disk Access list.
-
-### Updating the dedicated Node later
-
-Drop a newer official LTS tarball into `~/mcp-runtime/`, repoint the
-`node-current` symlink, and restart your client. The signing identity is
-unchanged, so existing grants carry over — no re-approval.
+If testing another Node runtime, obtain it from its official distributor,
+verify its current signature and checksum, configure the MCP host to use the
+local executable, then verify the actual macOS permission behavior. This
+repository does not recommend a particular alternate runtime or guarantee that
+permissions persist across updates.

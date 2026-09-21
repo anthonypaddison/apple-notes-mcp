@@ -1431,8 +1431,8 @@ registerTool(
     }
 
     // Label with the account name Notes.app actually resolved to, not the one
-    // that was asked for — a unique prefix like "robert" resolves to the full
-    // "robert.b.sweet@gmail.com", and echoing the request would hide that (#128).
+    // that was asked for — a unique prefix like "alexander" resolves to the full
+    // "alexander@example.test", and echoing the request would hide that (#128).
     const resolvedAcct = folders[0]?.account ? ` (${folders[0].account})` : acct;
     const folderList = folders.map((f) => `  - ${f.name}`).join("\n");
     return successResponse(

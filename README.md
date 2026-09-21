@@ -1,19 +1,12 @@
-# Apple Notes MCP Server
+# Apple Notes MCP Server (Unofficial Derivative)
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that enables AI assistants like Claude to read, create, search, and manage notes in Apple Notes on macOS.
+An unofficial derivative of [sweetrb/apple-notes-mcp](https://github.com/sweetrb/apple-notes-mcp), a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Apple Notes on macOS. This repository preserves the upstream MIT licence and notices; see [LICENSE](LICENSE) and [CUSTOMISATION.md](CUSTOMISATION.md).
 
-[![npm version](https://img.shields.io/npm/v/apple-notes-mcp)](https://www.npmjs.com/package/apple-notes-mcp)
-[![npm downloads](https://img.shields.io/npm/dm/apple-notes-mcp)](https://www.npmjs.com/package/apple-notes-mcp)
-[![node](https://img.shields.io/node/v/apple-notes-mcp)](https://www.npmjs.com/package/apple-notes-mcp)
-[![CI](https://github.com/sweetrb/apple-notes-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/sweetrb/apple-notes-mcp/actions/workflows/ci.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sweetrb/apple-notes-mcp/badge)](https://scorecard.dev/viewer/?uri=github.com/sweetrb/apple-notes-mcp)
 [![platform: macOS](https://img.shields.io/badge/platform-macOS-111?logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-server-blue)](https://modelcontextprotocol.io)
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/sweetrb/apple-notes-mcp/main/codex/assets/screenshot.png" alt="Apple Notes MCP — create, search, and organize Apple Notes from Codex, Claude, and other AI assistants" width="680">
-</p>
+For this source-only release, the only supported installation path is to clone and build this repository, then configure the local executable below. Repository plugin manifests are not supported installation methods: the Codex and Antigravity templates invoke `npx apple-notes-mcp` and can resolve the upstream package, while the Claude manifest's local bundle is part of a separate plugin distribution path. Do not install these templates as this derivative; plugin packaging and marketplace distribution are out of scope.
 
 ## What is This?
 
@@ -25,139 +18,81 @@ This server acts as a bridge between AI assistants and Apple Notes. Once configu
 - "Move my draft notes to the Archive folder"
 - "What notes do I have in my Work folder?"
 
-The AI assistant communicates with this server, which then uses AppleScript to interact with the Notes app on your Mac. All data stays local on your machine.
+The MCP server communicates with its host over local stdio and uses AppleScript to interact with Notes.app. The host or model may receive note content returned by read operations; where that content is sent depends on the MCP client and its privacy settings.
 
-## Quick Start
+### Permission defaults
 
-### Using Claude Code (Easiest)
+Read capability is enabled by default. Write and destructive capabilities are separate opt-ins and both default to disabled. A capability is enabled only when its corresponding environment value is exactly the lowercase string `"true"`; values such as `TRUE`, `1`, `yes`, `false`, empty, or malformed values disable it. Tools requiring a disabled capability are not registered, so MCP clients do not see them. Read resources and prompts are also hidden when read is disabled; the `new-meeting-note` prompt is available only when write is enabled. See [Configuration](#configuration) for the three exact variables.
 
-If you're using [Claude Code](https://claude.com/product/claude-code) (in Terminal or VS Code), just ask Claude to install it:
+## Installation
 
-```
-Install the sweetrb/apple-notes-mcp MCP server so you can help me manage my Apple Notes
-```
-
-Claude will handle the installation and configuration automatically.
-
-Or register it yourself with one deterministic command:
+Build and run this derivative from a clone of this repository. No npm package or marketplace installation for this derivative is documented or implied here.
 
 ```bash
-claude mcp add apple-notes -s user -- npx -y apple-notes-mcp
+git clone https://github.com/anthonypaddison/apple-notes-mcp.git
+cd apple-notes-mcp
+corepack pnpm install --frozen-lockfile
+corepack pnpm run build
 ```
 
-### Using the Plugin Marketplace
+Register the resulting `build/index.js` with your MCP host using absolute paths. For example, in a host configuration that uses the `mcpServers` format:
 
-Install as a Claude Code plugin for automatic configuration and enhanced AI behavior:
-
-```bash
-/plugin marketplace add sweetrb/apple-notes-mcp
-/plugin install apple-notes
-```
-
-This method also installs a **skill** that teaches Claude when and how to use Apple Notes effectively.
-
-On the first tool call, macOS shows an Automation permission prompt ("Claude" wants access to control "Notes") — click **OK**. Optionally, grant **Full Disk Access** to the app that launches the server to enable the database-backed tools (`get-checklist-state`, `get-note-metadata`, `get-note-link`, checklist annotations in `get-note-markdown`, and full `get-sync-status` detail); see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md). The rest of the server is pure AppleScript and works without it.
-
-### Using the Codex Marketplace
-
-The same plugin is available for Codex. Add the marketplace and install the plugin:
-
-```bash
-codex plugin marketplace add sweetrb/apple-notes-mcp
-codex plugin add apple-notes@apple-notes-mcp
-```
-
-The Codex plugin runs the published `apple-notes-mcp` server through `npx` and ships the same Apple Notes skill, so behavior matches the Claude Code plugin.
-
-### Other Hosts (Hermes, Antigravity)
-
-Two more hosts can run the same `apple-notes` MCP server (`npx -y apple-notes-mcp`):
-
-- **[Hermes Agent](https://hermes-agent.nousresearch.com/)** (NousResearch) — Hermes has no plugin/marketplace drop-in, so there is nothing in this repo to install from. Register the server with the CLI:
-
-  ```bash
-  hermes mcp add apple-notes --command npx --args -y apple-notes-mcp
-  ```
-
-  Or add it to `~/.hermes/config.yaml` by hand:
-
-  ```yaml
-  mcp_servers:
-    apple-notes:
-      command: npx
-      args: ["-y", "apple-notes-mcp"]
-  ```
-
-  Restart your Hermes session afterward so the tools load.
-- **[Antigravity](https://antigravity.google/)** (Google) — add the server entry from [`.antigravity-plugin/mcp_config.json`](https://github.com/sweetrb/apple-notes-mcp/blob/main/.antigravity-plugin/mcp_config.json) to `~/.gemini/config/mcp_config.json` (or via Antigravity's MCP settings).
-
-### Using Claude Desktop
-
-**1. Install the server:**
-```bash
-npm install -g apple-notes-mcp
-```
-
-**2. Add to Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
     "apple-notes": {
-      "command": "npx",
-      "args": ["-y", "apple-notes-mcp"]
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/apple-notes-mcp/build/index.js"]
     }
   }
 }
 ```
 
-**3. Restart Claude Desktop** and start using natural language:
-```
-"Create a note called 'Ideas' with my brainstorming thoughts"
-```
+Use the Node executable available on your machine (Node.js 20 or newer) and replace both paths. Do not substitute `npx apple-notes-mcp`: that package name currently resolves outside this repository. The tracked Codex and Antigravity plugin configurations have the same limitation; use the local executable entry above, not those repository plugin templates.
 
-On first use, macOS will ask for permission to automate Notes.app. Click "OK" to allow.
+On first use, macOS may prompt an app to control Notes.app through Automation. Allow only if you intend to grant that access. Full Disk Access is optional and only needed for the database-backed features listed in [Full Disk Access](#full-disk-access). The app macOS associates with access can depend on the host and runtime; follow the [Full Disk Access guide](docs/FULL-DISK-ACCESS.md) and verify with `doctor` rather than assuming a universal target.
 
 ## Requirements
 
 - **macOS** - Apple Notes and AppleScript are macOS-only
 - **Node.js 20+** - Required for the MCP server
-- **Apple Notes** - Must have at least one account configured (iCloud, Gmail, etc.)
+- **Notes.app** - Available on macOS; an account containing notes is needed for useful note operations
 
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| **Create Notes** | Create notes with titles, content, and optional folder/account targeting |
+| **Create Notes** | Create notes with titles, content, and optional folder/account targeting (write opt-in) |
 | **Search Notes** | Find notes by title or search within note content |
 | **Read Notes** | Retrieve note content and metadata |
-| **Update Notes** | Modify existing notes (title and/or content) |
-| **Delete Notes** | Remove notes (moves to Recently Deleted) |
-| **Move Notes** | Organize notes into folders (supports nested paths) |
-| **Folder Management** | Create, list, and delete folders with full hierarchical path support |
+| **Update Notes** | Modify existing notes (title and/or content; write opt-in) |
+| **Delete Notes** | Delete notes (destructive opt-in) |
+| **Move Notes** | Organize notes into folders (supports nested paths; write opt-in) |
+| **Folder Management** | List folders by default; creating folders requires write and deleting folders requires destructive access |
 | **Multi-Account** | Work with iCloud, Gmail, Exchange, or any configured account, including account IDs and default folders |
-| **Batch Operations** | Delete or move multiple notes at once |
+| **Batch Operations** | Move multiple notes (write opt-in) or delete multiple notes (destructive opt-in) |
 | **Checklist State** | Read checklist done/undone state directly from the Notes database (requires Full Disk Access) |
 | **Export** | Export all notes as JSON or get individual notes as Markdown |
-| **Attachments** | List attachments, save them to disk, or fetch their bytes as base64 |
+| **Attachments** | List and fetch attachments by default; saving an attachment to disk requires write access |
 | **Notes.app UI State** | Reveal a note in Notes.app or read the current Notes.app selection |
 | **Sync Awareness** | Detect iCloud sync in progress, warn about incomplete results |
 | **Collaboration** | Detect shared notes, warn before modifying |
 | **Diagnostics** | `health-check` plus a richer `doctor` (reachability, automation permission, accounts, Full Disk Access), sync status, and statistics |
 
-Read/list/get tools also return **structured JSON** (`structuredContent`) alongside the text, so agents can consume results without parsing prose.
+Read/list/get tools also return **structured JSON** (`structuredContent`) alongside the text, so agents can consume results without parsing prose. Write and destructive tools described below are available only when their respective capabilities are explicitly enabled; otherwise, they are absent from the client's tool list.
 
 ### MCP resources & prompts
 
-Resources expose read-only context the client can attach without a tool call:
+When read capability is enabled, resources expose read-only context the client can attach without a tool call:
 `notes://accounts`, `notes://folders`, `notes://stats`, and the
 `notes://note/{id}` template (returns the note as Markdown). Prompts package
-common workflows: `find-note`, `weekly-review`, `new-meeting-note`.
+common read workflows: `find-note`, `weekly-review`. The `new-meeting-note` prompt is registered only when write access is enabled.
 
 ### AppleScript limitations
 
 A few Notes UI features are not exposed to AppleScript. Some are recovered by
 reading Notes' own database instead; the rest genuinely cannot be supported. See
-**[docs/APPLESCRIPT-LIMITATIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/APPLESCRIPT-LIMITATIONS.md)**
+**[AppleScript limitations](docs/APPLESCRIPT-LIMITATIONS.md)**
 for the investigation and verification behind each:
 
 - **Pinned notes** — Notes has no scriptable `pinned` property via AppleScript. Pin state can now be **read** with the BETA `get-note-metadata` tool (from the NoteStore database), but it still cannot be **set** programmatically.
@@ -167,7 +102,7 @@ for the investigation and verification behind each:
 
 ## Tool Reference
 
-This section documents all available tools. AI agents should use these tool names and parameters exactly as specified.
+This section documents the implementation's full tool surface. Tools appear to an MCP client only when their required permission is enabled; by default, read tools are available and write/destructive tools are hidden.
 
 ### Note Operations
 
@@ -287,7 +222,7 @@ Retrieves the full content of a specific note.
 **Returns:** The HTML content of the note, or error if not found. The
 `structuredContent` also includes `hashtags` — any inline `#hashtag` tags parsed
 from the body. Apple Notes tags are inline hashtags, not a scriptable property;
-see [docs/APPLESCRIPT-LIMITATIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/APPLESCRIPT-LIMITATIONS.md#tags--hashtags-29). Smart Folders are not scriptable.
+see [AppleScript limitations](docs/APPLESCRIPT-LIMITATIONS.md#tags--hashtags-29). Smart Folders are not scriptable.
 
 **⚠️ The returned body can be lossy — do not write it back verbatim.** Inline
 base64 images larger than `APPLE_NOTES_MCP_MAX_INLINE_IMAGE_BYTES` (default
@@ -428,7 +363,7 @@ Updates an existing note's content and/or title.
 
 **Note:** `newContent` **replaces the entire note body** — it is not appended. To add to a note, prefer [`append-to-note`](#append-to-note), which does the read-and-concatenate for you and always round-trips the body as HTML. If you do read-modify-write by hand, note that `get-note-content` replaces oversized inline images with text placeholders (see [`get-note-content`](#get-note-content)) — writing that body back bakes the placeholders in.
 
-**Attachments:** A full-body replace can drop embedded files, images, scans, PDFs, or audio. When a note may hold attachments, run [`list-attachments`](#list-attachments) first, and either save them with `save-attachment` or build a new note rather than overwriting. See the skill's [Attachment-Safe Updates](https://github.com/sweetrb/apple-notes-mcp/blob/main/skills/apple-notes/SKILL.md#attachment-safe-updates) guidance.
+**Attachments:** A full-body replace can drop embedded files, images, scans, PDFs, or audio. When a note may hold attachments, run [`list-attachments`](#list-attachments) first, and either save them with `save-attachment` or build a new note rather than overwriting. See the [Apple Notes skill](skills/apple-notes/SKILL.md#attachment-safe-updates) guidance.
 
 ---
 
@@ -558,7 +493,7 @@ Returns the `notes://showNote?identifier=<uuid>` deep-link URL for a note. The U
 
 **Returns:** `notes://showNote?identifier=<uuid>` URL string, plus the note id and title.
 
-**Note:** Requires Full Disk Access for the app that launches the server so the Notes SQLite database is readable. On macOS 12–15 the tool also falls back to the AppleScript `note link` property. Run the `doctor` tool to verify access.
+**Note:** The database-backed path requires Full Disk Access for the process macOS authorizes for that access. On macOS 12–15 the tool can fall back to the AppleScript `note link` property; on macOS 26+ it cannot. The responsible permission entry depends on the host/runtime launch context. Run `doctor` and call the tool to verify access; see [Full Disk Access](#full-disk-access).
 
 ---
 
@@ -792,7 +727,7 @@ Gets a note's content as Markdown instead of HTML. If the note contains checklis
 
 Reads checklist done/undone state for a note. This bypasses the AppleScript limitation where `body of note` strips checklist state, by reading directly from the NoteStore SQLite database.
 
-**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+**Requires:** Full Disk Access for the process macOS authorizes for this database read (see [Full Disk Access](#full-disk-access)); verify access with `doctor` and a database-backed read.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -820,7 +755,7 @@ Checklist for "Shopping List" (2/4 done):
 
 Reads note metadata that AppleScript cannot expose, by querying the NoteStore SQLite database directly: pinned state, checklist flags, trash/recovery state, the preview snippet, and the password hint. The available fields vary by macOS version.
 
-**Requires:** Full Disk Access for the MCP host process (see [Full Disk Access Setup](#full-disk-access)).
+**Requires:** Full Disk Access for the process macOS authorizes for this database read (see [Full Disk Access](#full-disk-access)); verify access with `doctor` and a database-backed read.
 
 **BETA:** the NoteStore schema changes between macOS releases, so some fields can be absent on older or newer systems. The database is only ever read, never written.
 
@@ -907,7 +842,7 @@ Run a full setup diagnostic: Notes.app reachability, the Automation permission, 
 
 **Parameters:** None
 
-**Returns:** A per-check report (`structuredContent` carries the raw `{healthy, checks[]}`). The Full Disk Access check tells you whether checklist-state features will work — see [Full Disk Access Setup](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).
+**Returns:** A per-check report (`structuredContent` carries the raw `{healthy, checks[]}`). The Full Disk Access check tells you whether checklist-state features will work — see [Full Disk Access](#full-disk-access).
 
 ---
 
@@ -981,13 +916,13 @@ AI: [calls list-notes with account="Gmail"]
 When you do pass `account`, it is resolved in this order:
 
 1. **Exact name match** wins outright.
-2. A **unique prefix match** resolves — `account="robert"` finds
-   `robert.b.sweet@gmail.com`.
+2. A **unique prefix match** resolves — `account="work"` finds
+   `work-notes`.
 3. An **ambiguous prefix is refused**, with every candidate named:
 
    ```
-   Account "rob" is ambiguous - it matches 2 accounts:
-   rob@superiortech.io, robert.b.sweet@gmail.com. Use the full account name.
+   Account "work" is ambiguous - it matches 2 accounts:
+   work-notes, work-archive. Use the full account name.
    ```
 
 That third rule is deliberate. Silently taking the *first* prefix match would
@@ -1017,53 +952,6 @@ AI: [calls create-note with title="Acme Corp", content="...", folder="Work/Clien
 
 ---
 
-## Installation Options
-
-### npm (Recommended)
-
-```bash
-npm install -g apple-notes-mcp
-```
-
-### From Source
-
-```bash
-git clone https://github.com/sweetrb/apple-notes-mcp.git
-cd apple-notes-mcp
-```
-
-The repo ships a prebuilt, dependency-free `build/index.js`, so a bare clone runs with nothing but Node installed. `pnpm install` and `pnpm run build` are only needed when you change the source (development uses [pnpm](https://pnpm.io/), not npm).
-
-You can also install straight from the git repo with `npm install -g github:sweetrb/apple-notes-mcp` (building from source requires pnpm), but the published npm package above is the recommended path.
-
-If installed from source, use this configuration:
-```json
-{
-  "mcpServers": {
-    "apple-notes": {
-      "command": "node",
-      "args": ["/path/to/apple-notes-mcp/build/index.js"]
-    }
-  }
-}
-```
-
-#### Running from a clone in Claude Code (project-scope `.mcp.json`)
-
-This repo ships a `.mcp.json` at its root so that, when you run `claude` from inside a clone, the server is registered automatically as a **project-scope** server — no manual config needed. Just launch Claude Code from the repo directory and approve the server when prompted (the bundled `build/index.js` is committed, so no build step is required).
-
-The entrypoint is written as (an excerpt of that file, not a whole config):
-
-```text
-"args": ["${CLAUDE_PROJECT_DIR:-.}/build/index.js"]
-```
-
-`CLAUDE_PROJECT_DIR` is the variable Claude Code injects into a project/user-scoped server's environment, and it resolves to the repo root. **You must launch `claude` from inside the repo** for this to work — the bare `.` fallback is only a last resort and is *not* reliable, because it resolves against the launching process's working directory, not the repo.
-
-> **Why not `${CLAUDE_PLUGIN_ROOT}`?** `CLAUDE_PLUGIN_ROOT` is set **only** for marketplace plugin installs, never for a project-scope clone, so it can't drive the clone workflow. Conversely, a plugin install can't use `CLAUDE_PROJECT_DIR` (in a plugin, that points at the *user's* project, not the plugin's own directory). Claude Code does **not** support nested defaults like `${CLAUDE_PLUGIN_ROOT:-${CLAUDE_PROJECT_DIR:-.}}`, so a single entrypoint string cannot serve both contexts. The two distribution paths are therefore decoupled: the **plugin** carries its own MCP config in `.claude-plugin/plugin.json` (using `${CLAUDE_PLUGIN_ROOT}`), while the root `.mcp.json` is dedicated to the **clone** workflow (using `${CLAUDE_PROJECT_DIR:-.}`). Because `plugin.json` declares its own `mcpServers`, the plugin does not also auto-load the root `.mcp.json`, so there is no double-registration.
-
-> **Heads-up on scope precedence:** project-scope (`.mcp.json`) outranks user-scope. If you *also* have an `apple-notes` entry registered at user scope (e.g. an absolute path in `~/.claude.json`), the project-scope entry wins and the user-scope one is ignored entirely. Pick one — for local development on this repo, the project-scope `.mcp.json` is the intended source. To pin a specific local build instead, register it at **local** scope (`claude mcp add apple-notes -s local -- node /abs/path/build/index.js`), which outranks project scope.
-
 ---
 
 ## Configuration
@@ -1071,6 +959,16 @@ The entrypoint is written as (an excerpt of that file, not a whole config):
 ### Environment variables
 
 All configuration is optional — the server works out of the box. Override behavior with these variables (set them in your MCP client's `env` block, or via the [config file](#configuration-file-when-the-host-strips-env) below):
+
+Permission switches (also accepted through the JSON config file) are:
+
+| Variable | Default | Enablement rule |
+|----------|---------|-----------------|
+| `APPLE_NOTES_MCP_ALLOW_READ` | enabled | Read tools, resources, and read prompts are enabled when missing. If supplied, only the exact lowercase string `"true"` enables them. |
+| `APPLE_NOTES_MCP_ALLOW_WRITE` | disabled | Write tools and the `new-meeting-note` prompt are registered only when the exact lowercase string `"true"` is supplied. |
+| `APPLE_NOTES_MCP_ALLOW_DESTRUCTIVE` | disabled | Destructive tools are registered only when the exact lowercase string `"true"` is supplied. This switch is independent of write access. |
+
+Tools requiring a disabled capability are not registered with the MCP server, so clients cannot see or call them. The three capabilities are independent: enabling destructive access does not implicitly enable write access, and vice versa.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -1098,30 +996,29 @@ file the host doesn't manage — `APPLE_NOTES_MCP_CONFIG_FILE`, or by default
 }
 ```
 
-The server reads it at startup and merges values into the environment **without
-overriding** anything already set there (so an explicit `env` still wins). This
-is the recommended way to configure the server under Claude Desktop. Apple Notes
-MCP stores no secrets, but as a general rule keep only non-secret config here.
+The server reads it at startup and merges string values into the environment.
+A non-empty value already present in the process environment wins; an empty
+value is treated as unset and can be replaced by the file. This config is not a
+secret store, so keep credentials and other secrets out of it.
 
 ---
 
 ## Full Disk Access
 
-Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process running the MCP server: `get-checklist-state`, `get-note-metadata`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
+Several tools read directly from the Apple Notes SQLite database, which lives in a macOS-protected directory. Those tools require **Full Disk Access** for the process macOS authorizes: `get-checklist-state`, `get-note-metadata`, `get-note-link`, the checklist annotations in `get-note-markdown`, and the database half of `get-sync-status`.
 
-> 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access Setup Guide](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
+> 📘 **For the full why-and-how walkthrough (which app to grant, verifying with `doctor`, graceful degradation), see the [Full Disk Access guide](docs/FULL-DISK-ACCESS.md).** The summary below is the quick version.
 
 ### How to Grant Full Disk Access
 
 1. Open **System Settings** (or System Preferences on older macOS)
 2. Go to **Privacy & Security > Full Disk Access**
-3. Click the **+** button
-4. Add the application that hosts the MCP server:
-   - **Claude Desktop**: Add `/Applications/Claude.app`
-   - **Terminal**: Add `/Applications/Utilities/Terminal.app`
-   - **VS Code**: Add `/Applications/Visual Studio Code.app`
-   - **iTerm**: Add `/Applications/iTerm.app`
-5. Restart the application after granting access
+3. Click the **+** button and add the application macOS associates with the
+   server process for this launch method. Which entry is responsible can depend
+   on the host and runtime; this repository's source and documentation do not
+   establish a universal target. Avoid granting access to extra apps by guess.
+4. Restart the relevant host/process and run `doctor`; confirm database-backed
+   reads work before relying on them.
 
 ### Without Full Disk Access
 
@@ -1136,9 +1033,9 @@ Every tool that does not read the Notes database works normally without Full Dis
 
 ## Security and Privacy
 
-- **Local only** - All operations happen locally via AppleScript. No data is sent to external servers.
-- **Permission required** - macOS will prompt for automation permission on first use.
-- **Password-protected notes** - Notes with passwords cannot be read or modified via this server.
+- **Local process** - The server uses local stdio and AppleScript and does not itself implement network requests. An MCP host or model may transmit returned note content according to its own service and privacy settings.
+- **Automation permission** - macOS may prompt the responsible app to control Notes.app when Apple Events are first used.
+- **Password-protected notes** - Protected note content is unavailable unless unlocked in Notes.app; some metadata may still be visible.
 - **No credential storage** - The server doesn't store any passwords or authentication tokens.
 
 ---
@@ -1152,7 +1049,7 @@ Every tool that does not read the Notes database works normally without Full Dis
 | Pinned notes are read-only | AppleScript exposes no `pinned` property. Pin state is readable via the BETA `get-note-metadata` tool (NoteStore database, needs Full Disk Access) but cannot be set ([#28](https://github.com/sweetrb/apple-notes-mcp/issues/28)) |
 | Limited rich formatting | Use `format: "html"` on create/update for headings, lists, bold, code blocks; some complex formatting may not render |
 | Title matching | Most operations require exact title matches |
-| Checklist state | Requires [Full Disk Access](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/FULL-DISK-ACCESS.md) to read done/undone state from the database |
+| Checklist state | Requires [Full Disk Access](docs/FULL-DISK-ACCESS.md) to read done/undone state from the database |
 | Checklist **creation** | Not supported. AppleScript's `body of note` setter strips `<input type="checkbox">` and ignores any checklist-styling CSS class. Apple Notes stores checklist items as a protobuf paragraph style (`style_type=103`) that AppleScript doesn't expose, and the SQLite database is read-only. See [Creating Checklists](#creating-checklists) below for the workaround. |
 
 ### Creating Checklists
@@ -1254,16 +1151,17 @@ you are on a version older than **2.7.2**. MCP standardized on JSON Schema
 dialect, so clients rejected all of them at once — nothing about your Notes
 library, permissions, or configuration is involved.
 
-- Fix: upgrade to 2.7.2 or later. `npx -y apple-notes-mcp@latest` picks it up on
-  the next launch; a marketplace install updates through the marketplace.
-- Running from a clone: `git pull && pnpm install && pnpm run build`, then
+- Fix: use a corrected version of this derivative built from this repository;
+  do not use `npx apple-notes-mcp` or an upstream marketplace plugin to update
+  this checkout.
+- Running from a clone: pull the intended repository revision, run
+  `corepack pnpm install --frozen-lockfile && corepack pnpm run build`, then
   restart the client.
 
-### `apple-notes` server fails to connect when run from a clone
-- Launch `claude` from **inside the repo directory** so `CLAUDE_PROJECT_DIR` resolves to the repo root (the bare `.` fallback is unreliable — it points at the launching process's working directory)
-- If you've been editing the source, rerun `pnpm run build` — the entrypoint is `${CLAUDE_PROJECT_DIR:-.}/build/index.js`, and the committed bundle only reflects your changes after a rebuild
-- Run `claude mcp list` to check for a conflicting `apple-notes` entry at another scope (project-scope outranks user-scope, but local-scope outranks project-scope)
-- Approve the pending project-scope server when Claude Code prompts you
+### `apple-notes` server fails to connect
+- Confirm the host's MCP entry launches the local absolute path to `build/index.js` from this repository; the tracked Codex and Antigravity plugin templates currently launch an npm package instead.
+- Rebuild after source changes with `corepack pnpm run build` and restart the host.
+- Check the host's MCP server status and logs for startup or permission errors.
 
 ---
 
@@ -1283,32 +1181,29 @@ pnpm run format         # Format code
 
 The integration suite (`test/integration.test.ts`) drives the real
 `AppleNotesManager → AppleScript → Notes.app` stack — creating, reading,
-searching, and deleting throwaway notes. Its live tests self-skip when no
-writable Notes account is available (e.g. CI), so it is safe to run anywhere;
-the pure path-safety and hashtag tests always run.
+searching, and deleting throwaway notes. Its setup probes configured accounts by
+creating and deleting a note, so the suite can modify the Notes library selected
+by the test process. Do not run the live suite against a personal Notes library;
+use a dedicated disposable macOS account and Notes library. The pure
+path-safety and hashtag tests need no Notes.app and always run.
 
 ---
 
-## Author
+## Attribution
 
-**Rob Sweet** - President, [Superior Technologies Research](https://www.superiortech.io)
-
-A software consulting, contracting, and development company.
-
-- Email: rob@superiortech.io
-- GitHub: [@sweetrb](https://github.com/sweetrb)
+This repository is an unofficial derivative of [sweetrb/apple-notes-mcp](https://github.com/sweetrb/apple-notes-mcp). The upstream project's MIT licence and notices are preserved.
 
 ## License
 
-MIT License - see [LICENSE](https://github.com/sweetrb/apple-notes-mcp/blob/main/LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## Related Projects
 
-Part of a family of macOS MCP servers:
+Related projects maintained upstream:
 
 - [apple-mail-mcp](https://github.com/sweetrb/apple-mail-mcp) — MCP server for Apple Mail (read, search, send, and organize email)
 - [apple-numbers-mcp](https://github.com/sweetrb/apple-numbers-mcp) — MCP server for Apple Numbers (read and write .numbers spreadsheets)
@@ -1316,4 +1211,4 @@ Part of a family of macOS MCP servers:
 
 ## Recurring macOS permission prompts
 
-If macOS keeps re-prompting for Full Disk Access or Automation for `node` (often after a `brew upgrade`), the cause is almost always an **ad-hoc-signed Node** (typically Homebrew's): its code signature (cdhash) changes on every update, so macOS TCC treats each new build as a brand-new binary and silently drops the grants you already made. The fix is to run this server under an official, **Developer-ID-signed Node at a stable path** — its signing identity stays the same across updates, so you grant the permission once and it persists. The `doctor` tool detects the ad-hoc-signature case and the full walkthrough is in [docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md](https://github.com/sweetrb/apple-notes-mcp/blob/main/docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md).
+If macOS repeats Full Disk Access or Automation prompts after a runtime update, the host process identity or runtime signature may have changed. See [Node runtime and TCC permissions](docs/NODE-RUNTIME-AND-TCC-PERMISSIONS.md) for background and troubleshooting; this behavior depends on macOS and the specific host/runtime, so stable permission persistence is not guaranteed.

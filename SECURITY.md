@@ -1,33 +1,13 @@
 # Security Policy
 
-## Supported Versions
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 2.x.x   | :white_check_mark: |
-| < 2.0   | :x:                |
+This repository is an unofficial derivative of [sweetrb/apple-notes-mcp](https://github.com/sweetrb/apple-notes-mcp). The upstream MIT licence and copyright notices remain in [LICENSE](LICENSE).
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it by emailing:
+There is no dedicated security contact or response-time commitment published for this derivative. If GitHub private vulnerability reporting is enabled for this repository, use that feature. If it is not available, do not post sensitive vulnerability details in a public issue; contact the repository maintainer through a contact method independently verified from the repository owner's GitHub profile.
 
-**rob@superiortech.io**
+## Security Context
 
-Please include:
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
+The server is a local stdio MCP process that uses AppleScript to interact with Notes.app. It does not itself provide a remote service, but an MCP host or model may receive note content returned by read operations; review the host's data-handling and privacy settings. macOS Automation and, for certain database-backed reads, Full Disk Access are governed by macOS and can be revoked in System Settings.
 
-You will receive a response within 48 hours acknowledging receipt. Security issues will be prioritized and addressed as quickly as possible.
-
-## Security Considerations
-
-This MCP server:
-- Runs locally on your machine
-- Uses AppleScript to interact with Notes.app
-- Does not transmit data to external servers
-- Does not store credentials or passwords
-- Cannot access password-protected notes
-
-The server requires macOS automation permissions to function. These permissions are managed by macOS and can be revoked at any time in System Settings > Privacy & Security > Automation.
+Read capability is enabled by default. Write and destructive capabilities are separately disabled by default and require their exact opt-in settings; unavailable tools are not registered. See [README.md](README.md#permission-defaults) for the implementation's current behavior.

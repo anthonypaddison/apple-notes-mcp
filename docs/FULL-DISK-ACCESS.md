@@ -37,29 +37,29 @@ That database lives in a macOS-protected directory:
 ```
 
 Reading anything under `~/Library/Group Containers/` requires **Full Disk
-Access** for the host process — without it, macOS denies the read. (The MCP only
-ever **reads** this database; it never writes to it.)
+Access** for the process macOS authorizes — without it, macOS denies the read.
+(The MCP only ever **reads** this database; it never writes to it.) Which app
+entry is responsible can depend on the host and runtime launch context; this
+repository has not verified one universal grant target across configurations.
 
 ## How to grant Full Disk Access
 
 1. Open **System Settings** (or **System Preferences** on older macOS).
 2. Go to **Privacy & Security → Full Disk Access**.
 3. Click the **+** button (you may need to unlock with Touch ID / your password
-   first), and add the application that **hosts** the MCP server — i.e. the app
-   that actually launches `node`:
-   - **Claude Desktop** → `/Applications/Claude.app`
-   - **Terminal** (if you run Claude Code from a shell) → `/Applications/Utilities/Terminal.app`
-   - **iTerm** → `/Applications/iTerm.app`
-   - **VS Code** → `/Applications/Visual Studio Code.app`
-4. Make sure the toggle next to the app is **on**.
-5. **Fully quit and reopen the host app.** macOS only applies the new permission
-   to processes started *after* the change — a reload or restart-server is not
-   enough; the host application itself must be quit (⌘Q) and relaunched.
+   first), and add the app macOS associates with this server's database access.
+   Do not assume the host app or the Node executable is always the correct entry;
+   the responsible identity can depend on the launch method.
+4. Make sure the selected entry is enabled, then fully quit and restart the
+   relevant host/process.
+5. Run `doctor` and try a database-backed read to verify access. If it still
+   fails, remove any unnecessary grants and consult the macOS privacy settings
+   for the actual app/process responsible for the denied access.
 
-> **Grant FDA to the right app.** FDA applies to the process that spawns the
-> server, not to `node` or to Notes.app. If you launch Claude Code from iTerm,
-> grant it to iTerm; if you use Claude Desktop, grant it to Claude. Granting it to
-> the wrong app has no effect.
+> **Grant FDA narrowly.** Grant it only to the app macOS associates with the
+> denied database access. This can depend on the host/runtime launch context;
+> confirm with `doctor` and an actual database-backed read instead of granting
+> access to both a host and Node by default.
 
 ## Verifying it worked
 
