@@ -1,6 +1,6 @@
 {
   "name": "apple-notes-mcp",
-  "version": "2.7.5",
+  "version": "2.7.6",
   "packageManager": "pnpm@11.9.0",
   "description": "Unofficial derivative of sweetrb/apple-notes-mcp with independently gated read, write, and destructive MCP capabilities",
   "type": "module",
